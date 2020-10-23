@@ -36,6 +36,33 @@ class ConcatDataset(_ConcatDataset):
             sample_idx = idx - self.cumulative_sizes[dataset_idx - 1]
         return self.datasets[dataset_idx].get_cat_ids(sample_idx)
 
+    def evaluate(self, results, logger=None, **kwargs):
+        """Evaluate the results.
+        Args:
+            results (list[list | tuple]): Testing results of the dataset.
+            logger (logging.Logger | str | None): Logger used for printing
+                related information during evaluation. Default: None.
+        Returns:
+            dict[str: float]: AP results of the total dataset or each separate
+            dataset if `self.separate_eval=True`.
+        """
+        assert len(results) == self.cumulative_sizes[-1], \
+            ('Dataset and results have different sizes: '
+             f'{self.cumulative_sizes[-1]} v.s. {len(results)}')
+
+        # Check whether all the datasets support evaluation
+        for dataset in self.datasets:
+            assert hasattr(dataset, 'evaluate'), \
+                    f'{type(dataset)} does not implement evaluate function'
+
+        original_data_infos = self.datasets[0].data_infos
+        self.datasets[0].data_infos = sum(
+            [dataset.data_infos for dataset in self.datasets], [])
+        eval_results = self.datasets[0].evaluate(
+            results, logger=logger, **kwargs)
+        self.datasets[0].data_infos = original_data_infos
+        return eval_results
+
 
 @DATASETS.register_module()
 class RepeatDataset(object):
